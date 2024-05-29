@@ -19,8 +19,20 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
-      - name: Build Docker image
+      - name: Build Mlflow Docker image
         run: docker build ./mlflow -t ${{ secrets.DOCKERHUB_USERNAME }}/mlflow:1.0.0
 
-      - name: Push Docker image to DockerHub
+      - name: Push Mlflow Docker image to DockerHub
         run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/mlflow:1.0.0
+
+      - name: Build Inference Docker image
+        run: docker build ./inference -t ${{ secrets.DOCKERHUB_USERNAME }}/inference:1.0.0
+
+      - name: Push Inference Docker image to DockerHub
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/inference:1.0.0
+
+      - name: Build Streamlit Docker image
+        run: docker build ./streamlit -t ${{ secrets.DOCKERHUB_USERNAME }}/streamlit:1.0.0
+
+      - name: Push Streamlit Docker image to DockerHub
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/streamlit:1.0.0

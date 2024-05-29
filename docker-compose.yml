@@ -37,8 +37,7 @@ x-airflow-common:
       condition: service_healthy
     postgres:
       condition: service_healthy
-    mysql:
-      condition: service_healthy
+
 
 services:
   postgres:
@@ -56,42 +55,51 @@ services:
       start_period: 5s
     restart: always
     
-  mysql:
-    image: mysql:8.0
-    command: --default-authentication-plugin=mysql_native_password
+   
+  mlflowdb:
+    image: postgres:13
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: mlflowruns
-      MYSQL_USER: mlflowuser
-      MYSQL_PASSWORD: mlflowpass
-    ports:
-      - "3306:3306"    
+      POSTGRES_USER: mlflowuser
+      POSTGRES_PASSWORD: mlflowpass
+      POSTGRES_DB: mlflowruns
     volumes:
-      - mysql-mlflow:/var/lib/mysql
+      - mlflow-db-volume:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -prootpassword"]
-      interval: 30s
+      test: ["CMD", "pg_isready", "-d", "mlflowruns","-U","mlflowuser"]
+      interval: 10s
       retries: 5
-      timeout: 5s
+      start_period: 5s
     restart: always
 
-  modeldb:
-    image: mysql:8.0
-    command: --default-authentication-plugin=mysql_native_password
+  rawdb:
+    image: postgres:13
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: modeldb
-      MYSQL_USER: modeldbuser
-      MYSQL_PASSWORD: modeldbpass
-    ports:
-      - "3307:3306"
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -prootpassword"]
-      interval: 30s
-      retries: 5
-      timeout: 5s  
+      POSTGRES_USER: rawusr
+      POSTGRES_PASSWORD: rawpass
+      POSTGRES_DB: rawdb
     volumes:
-      - mysql-dataset:/var/lib/mysql
+      - raw-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "rawdb","-U","rawusr"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always 
+    
+  cleandb:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: cleanusr
+      POSTGRES_PASSWORD: cleanpass
+      POSTGRES_DB: cleandb
+    volumes:
+      - clean-db-volume:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "cleandb","-U","cleanusr"]
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    restart: always
 
   redis:
     image: redis:latest
@@ -302,9 +310,8 @@ services:
     restart: unless-stopped
     
   mlflow:
-    build: ./mlflow
-    image: mlflow_server
-    container_name: mlflow_server
+    container_name: Mlflow_server
+    image: c4ttiv0/mlflow:1.0.0
     ports:
       - "8082:5000"
     environment:
@@ -314,20 +321,31 @@ services:
       - AWS_SECRET_ACCESS_KEY=minioadmin
     depends_on:
       - minio
-      - mysql
-    command: mlflow server --backend-store-uri mysql+pymysql://mlflowuser:mlflowpass@mysql:3306/mlflowruns --default-artifact-root s3://mlflows3/artifacts --host 0.0.0.0 --serve-artifacts
+      - mlflowdb
+    command: mlflow server --backend-store-uri postgresql+psycopg2://mlflowuser:mlflowpass@mlflowdb/mlflowruns --default-artifact-root s3://mlflows3/artifacts --host 0.0.0.0 --serve-artifacts
       
   inference:
-    build: ./inference
+    container_name: Inference
+    image: c4ttiv0/inference:1.0.0
     ports:
       - "80:80"
     depends_on:
       - mlflow
 
+  streamlit: 
+    container_name: Streamlit_app
+    image: ca4ttiv0/streamlit:1.0.0
+    ports:
+      - "8089:8501"
+    depends_on:
+      - mlflow  
+    restart: always
 
 volumes:
   minio-data:
   postgres-db-volume:
-  mysql-mlflow:
-  mysql-dataset:
+  mlflow-db-volume:
+  raw-db-volume:
+  clean-db-volume:
+
 
